@@ -34,6 +34,10 @@ function App() {
   const [subscribedUsers, setSubscribedUsers] = useAtom(subscribedUsersAtom);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  // Status indicators
+  const [isConnected, setIsConnected] = useState(false);
+  const [isSending, setIsSending] = useState(false);
+  
   // Debug log: track subscribedUsers changes
   useEffect(() => {
     if (subscribedUsers.size > 0) {
@@ -450,6 +454,7 @@ function App() {
         const ws = new WebSocket(relayUrl);
         ws.onopen = () => {
           console.log(`✅ Connected to ${relayUrl}`);
+          setIsConnected(true);
           // Subscribe to messages for this channel only
           const channelId = getChannelId();
            const sub = {
@@ -553,10 +558,12 @@ function App() {
         
         ws.onerror = () => {
           console.log(`⚠️ WebSocket error for ${relayUrl} (this is normal for demo)`);
+          setIsConnected(false);
         };
         
         ws.onclose = () => {
           console.log(`🔌 Connection closed to ${relayUrl}`);
+          setIsConnected(false);
         };
         
         connections.push(ws);
@@ -571,6 +578,8 @@ function App() {
 
   const handleSendMessage = async () => {
     if (!newMessage.trim() || !user) return;
+    
+    setIsSending(true);
     
     try {
       const channelId = getChannelId();
@@ -652,6 +661,8 @@ function App() {
        console.log(`📤 Message sent: ${newMessage.substring(0, 30)}...`);
     } catch (error) {
       console.error('Failed to send message:', error);
+    } finally {
+      setIsSending(false);
     }
   };
 
@@ -670,7 +681,7 @@ function App() {
               Decentralized messaging
             </CardDescription>
             <div className="mt-4 flex items-center justify-center space-x-2">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <div className="w-2 h-2 bg-muted-foreground rounded-full"></div>
               <span className="text-sm text-muted-foreground">Powered by Nostr Protocol</span>
             </div>
           </CardHeader>
@@ -678,22 +689,22 @@ function App() {
           <CardContent className="space-y-6">
             {/* Mode selection */}
             <div className="flex bg-muted rounded-lg p-1">
-              <Button
-                variant={loginMode === 'signin' ? 'default' : 'ghost'}
-                className="flex-1"
-                onClick={() => setLoginMode('signin')}
-              >
-                <span className="mr-2">🔑</span>
-                Sign In
-              </Button>
-              <Button
-                variant={loginMode === 'signup' ? 'default' : 'ghost'}
-                className="flex-1"
-                onClick={() => setLoginMode('signup')}
-              >
-                <span className="mr-2">✨</span>
-                Sign Up
-              </Button>
+                <Button
+                  variant={loginMode === 'signin' ? 'default' : 'ghost'}
+                  className="flex-1"
+                  onClick={() => setLoginMode('signin')}
+                >
+                  <span className="mr-2">🔑</span>
+                  Sign In
+                </Button>
+                <Button
+                  variant={loginMode === 'signup' ? 'default' : 'ghost'}
+                  className="flex-1"
+                  onClick={() => setLoginMode('signup')}
+                >
+                  <span className="mr-2">✨</span>
+                  Sign Up
+                </Button>
             </div>
 
             {loginMode === 'signin' ? (
@@ -847,14 +858,16 @@ function App() {
                 
                 <div className="space-y-2">
                   <div className="bg-muted-foreground/10 rounded-lg p-2">
-                    <p className="text-xs text-muted-foreground font-medium mb-1">Current Channel</p>
+                    <div className="mb-1">
+                      <p className="text-xs text-muted-foreground font-medium">Current Channel</p>
+                    </div>
                     <p className="text-xs text-foreground font-mono break-all">{getChannelId()}</p>
                   </div>
                   
                   <div className="flex items-center space-x-2">
-                    <div className="w-2 h-2 bg-green-500 rounded-full"></div>
+                    <div className={`w-2 h-2 rounded-full ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
                     <span className="text-xs text-muted-foreground">
-                      Connected to {wsConnections.length} relays
+                      {isConnected ? `Connected to ${wsConnections.length} relays` : 'Disconnected'}
                     </span>
                   </div>
                 </div>
@@ -871,8 +884,10 @@ function App() {
                   <div className="w-8 h-8 bg-muted-foreground/10 rounded-full flex items-center justify-center">
                     <span className="text-muted-foreground text-sm">💬</span>
                   </div>
-                  <div>
-                    <h3 className="font-medium text-foreground">Chat</h3>
+                  <div className="flex-1">
+                    <div>
+                      <h3 className="font-medium text-foreground">Chat</h3>
+                    </div>
                     <p className="text-sm text-muted-foreground">Your conversation</p>
                   </div>
                 </div>
@@ -886,9 +901,8 @@ function App() {
                     <span className="text-muted-foreground text-sm">⚡</span>
                   </div>
                   <div className="flex-1">
-                    <div className="flex items-center space-x-2">
+                    <div>
                       <h4 className="font-medium text-foreground text-sm">Nostr Protocol</h4>
-                      <div className="w-2 h-2 bg-green-500 rounded-full"></div>
                     </div>
                     <p className="text-xs text-muted-foreground">Decentralized messaging</p>
                   </div>
@@ -896,17 +910,14 @@ function App() {
                 
                 <div className="space-y-2">
                   <div className="flex justify-between items-center">
-                    <div className="flex items-center space-x-2">
-                      <span className="text-xs text-muted-foreground">Messages</span>
-                      <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-                    </div>
+                    <span className="text-xs text-muted-foreground">Messages</span>
                     <Badge variant="secondary">{messages.length}</Badge>
                   </div>
                   <div className="flex justify-between items-center">
                     <span className="text-xs text-muted-foreground">Status</span>
-                    <Badge variant="outline" className="text-muted-foreground border-muted-foreground/20">
-                      <div className="w-2 h-2 bg-green-500 rounded-full mr-1"></div>
-                      Online
+                    <Badge variant="outline" className={`${isConnected ? 'text-green-600 border-green-200' : 'text-red-600 border-red-200'}`}>
+                      <div className={`w-2 h-2 rounded-full mr-1 ${isConnected ? 'bg-green-500' : 'bg-red-500'}`}></div>
+                      {isConnected ? 'Online' : 'Offline'}
                     </Badge>
                   </div>
                 </div>
@@ -927,10 +938,7 @@ function App() {
                 <span className="text-muted-foreground text-xl">💬</span>
               </div>
               <div className="flex-1">
-                <div className="flex items-center space-x-2">
-                  <CardTitle className="text-xl text-foreground">Chat</CardTitle>
-                  <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-                </div>
+                <CardTitle className="text-xl text-foreground">Chat</CardTitle>
                 <CardDescription className="text-muted-foreground">Connect with users on the same domain</CardDescription>
               </div>
             </div>
@@ -1025,12 +1033,12 @@ function App() {
               </div>
               <Button
                 onClick={handleSendMessage}
-                disabled={!newMessage.trim()}
+                disabled={!newMessage.trim() || isSending || !isConnected}
                 className="h-12 px-8"
                 size="lg"
               >
-                <span className="mr-2">🚀</span>
-                Send
+                <span className="mr-2">{isSending ? '⏳' : '🚀'}</span>
+                {isSending ? 'Sending...' : 'Send'}
               </Button>
             </div>
           </CardContent>
