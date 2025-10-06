@@ -652,67 +652,105 @@ function App() {
 
   if (step === 'login') {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-purple-50 flex items-center justify-center p-4">
-        <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+      <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-white to-cyan-50 flex items-center justify-center p-4 relative overflow-hidden">
+        {/* 背景装饰 */}
+        <div className="absolute inset-0 overflow-hidden">
+          <div className="absolute -top-40 -right-40 w-80 h-80 bg-purple-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
+          <div className="absolute -bottom-40 -left-40 w-80 h-80 bg-cyan-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
+          <div className="absolute top-40 left-1/2 transform -translate-x-1/2 w-60 h-60 bg-pink-300 rounded-full mix-blend-multiply filter blur-xl opacity-70 animate-pulse"></div>
+        </div>
+        
+        <div className="relative bg-white/80 backdrop-blur-sm rounded-3xl shadow-2xl p-8 w-full max-w-md border border-white/20">
           <div className="text-center mb-8">
-            <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-500 rounded-2xl flex items-center justify-center mx-auto mb-4">
-              <span className="text-2xl">💬</span>
+            <div className="w-20 h-20 bg-gradient-to-br from-indigo-500 via-purple-500 to-pink-500 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+              <span className="text-3xl">⚡</span>
             </div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-2">Nostr IM</h1>
-            <p className="text-gray-600">Decentralized messaging</p>
+            <h1 className="text-3xl font-bold bg-gradient-to-r from-indigo-600 to-purple-600 bg-clip-text text-transparent mb-2">
+              Nostr IM
+            </h1>
+            <p className="text-gray-600 text-lg">Decentralized messaging</p>
+            <div className="mt-4 flex items-center justify-center space-x-2">
+              <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+              <span className="text-sm text-gray-500">Powered by Nostr Protocol</span>
+            </div>
           </div>
 
           {/* 模式选择 */}
-          <div className="flex mb-6 bg-gray-100 rounded-xl p-1">
+          <div className="flex mb-8 bg-gradient-to-r from-gray-50 to-gray-100 rounded-2xl p-1.5 shadow-inner">
             <button
               onClick={() => setLoginMode('signin')}
-              className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all ${
+              className={`flex-1 py-3 px-6 rounded-xl font-semibold transition-all duration-300 ${
                 loginMode === 'signin'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-indigo-600 shadow-lg transform scale-105'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
               }`}
             >
-              Sign In
+              <span className="flex items-center justify-center space-x-2">
+                <span>🔑</span>
+                <span>Sign In</span>
+              </span>
             </button>
             <button
               onClick={() => setLoginMode('signup')}
-              className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all ${
+              className={`flex-1 py-3 px-6 rounded-xl font-semibold transition-all duration-300 ${
                 loginMode === 'signup'
-                  ? 'bg-white text-blue-600 shadow-sm'
-                  : 'text-gray-600 hover:text-gray-900'
+                  ? 'bg-white text-indigo-600 shadow-lg transform scale-105'
+                  : 'text-gray-600 hover:text-gray-900 hover:bg-white/50'
               }`}
             >
-              Sign Up
+              <span className="flex items-center justify-center space-x-2">
+                <span>✨</span>
+                <span>Sign Up</span>
+              </span>
             </button>
           </div>
 
           {loginMode === 'signin' ? (
             // Sign In 表单
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                  <span className="mr-2">🔐</span>
                   Private Key
                 </label>
-                <input
-                  type="password"
-                  placeholder="Enter your private key"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      const privateKey = (document.querySelector('input[placeholder="Enter your private key"]') as HTMLInputElement)?.value;
-                      if (privateKey?.trim()) {
-                        handleSignIn(privateKey.trim());
+                <div className="relative">
+                  <input
+                    type="password"
+                    placeholder="Enter your private key"
+                    className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all duration-300 bg-gray-50 focus:bg-white"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        const privateKey = (document.querySelector('input[placeholder="Enter your private key"]') as HTMLInputElement)?.value;
+                        if (privateKey?.trim()) {
+                          handleSignIn(privateKey.trim());
+                        }
                       }
-                    }
-                  }}
-                />
+                    }}
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                    <span className="text-gray-400">🔑</span>
+                  </div>
+                </div>
               </div>
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  <span className="font-semibold">Sign In with Private Key</span><br />
-                  Your username will be loaded from your profile.
-                </p>
+              
+              <div className="p-4 bg-gradient-to-r from-indigo-50 to-purple-50 rounded-2xl border border-indigo-100">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center">
+                      <span className="text-indigo-600 text-sm">ℹ️</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-indigo-800 mb-1">
+                      Sign In with Private Key
+                    </p>
+                    <p className="text-sm text-indigo-700">
+                      Your username will be loaded from your profile automatically.
+                    </p>
+                  </div>
+                </div>
               </div>
+              
               <button
                 onClick={() => {
                   const privateKey = (document.querySelector('input[placeholder="Enter your private key"]') as HTMLInputElement)?.value;
@@ -720,38 +758,58 @@ function App() {
                     handleSignIn(privateKey.trim());
                   }
                 }}
-                className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-600 transition-all duration-200"
+                className="w-full bg-gradient-to-r from-indigo-500 via-purple-500 to-pink-500 text-white py-4 px-6 rounded-2xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center space-x-2"
               >
-                Sign In
+                <span>🚀</span>
+                <span>Sign In</span>
               </button>
             </div>
           ) : (
             // Sign Up 表单
-            <div className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 mb-2">
+            <div className="space-y-6">
+              <div className="space-y-2">
+                <label className="block text-sm font-semibold text-gray-700 mb-3 flex items-center">
+                  <span className="mr-2">👤</span>
                   Username
                 </label>
-                <input
-                  type="text"
-                  placeholder="Choose a username"
-                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-                  onKeyPress={(e) => {
-                    if (e.key === 'Enter') {
-                      const name = (document.querySelector('input[placeholder="Choose a username"]') as HTMLInputElement)?.value;
-                      if (name?.trim()) {
-                        handleSignUp(name.trim());
+                <div className="relative">
+                  <input
+                    type="text"
+                    placeholder="Choose a username"
+                    className="w-full px-4 py-4 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-green-100 focus:border-green-400 transition-all duration-300 bg-gray-50 focus:bg-white"
+                    onKeyPress={(e) => {
+                      if (e.key === 'Enter') {
+                        const name = (document.querySelector('input[placeholder="Choose a username"]') as HTMLInputElement)?.value;
+                        if (name?.trim()) {
+                          handleSignUp(name.trim());
+                        }
                       }
-                    }
-                  }}
-                />
+                    }}
+                  />
+                  <div className="absolute inset-y-0 right-0 pr-3 flex items-center">
+                    <span className="text-gray-400">✨</span>
+                  </div>
+                </div>
               </div>
-              <div className="p-3 bg-blue-50 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  <span className="font-semibold">New to Nostr?</span><br />
-                  We'll generate a new private key for you. Make sure to save it!
-                </p>
+              
+              <div className="p-4 bg-gradient-to-r from-green-50 to-emerald-50 rounded-2xl border border-green-100">
+                <div className="flex items-start space-x-3">
+                  <div className="flex-shrink-0">
+                    <div className="w-8 h-8 bg-green-100 rounded-full flex items-center justify-center">
+                      <span className="text-green-600 text-sm">🆕</span>
+                    </div>
+                  </div>
+                  <div>
+                    <p className="text-sm font-semibold text-green-800 mb-1">
+                      New to Nostr?
+                    </p>
+                    <p className="text-sm text-green-700">
+                      We'll generate a new private key for you. Make sure to save it securely!
+                    </p>
+                  </div>
+                </div>
               </div>
+              
               <button
                 onClick={() => {
                   const name = (document.querySelector('input[placeholder="Choose a username"]') as HTMLInputElement)?.value;
@@ -759,9 +817,10 @@ function App() {
                     handleSignUp(name.trim());
                   }
                 }}
-                className="w-full bg-gradient-to-r from-green-500 to-blue-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-green-600 hover:to-blue-600 transition-all duration-200"
+                className="w-full bg-gradient-to-r from-green-500 via-emerald-500 to-teal-500 text-white py-4 px-6 rounded-2xl font-bold text-lg shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 flex items-center justify-center space-x-2"
               >
-                Create Account
+                <span>✨</span>
+                <span>Create Account</span>
               </button>
             </div>
           )}
@@ -771,37 +830,101 @@ function App() {
   }
 
   return (
-    <div className="h-screen bg-gray-50 flex">
+    <div className="h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50 flex">
       {/* Sidebar */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
-          <h1 className="text-xl font-bold text-gray-900">Nostr IM</h1>
-          <p className="text-sm text-gray-600">Welcome, {user?.name}</p>
-          <p className="text-xs text-gray-500 font-mono break-all">
-            {user?.pubkey}
-          </p>
-          <div className="mt-2 p-2 bg-blue-50 rounded-lg">
-            <p className="text-xs text-blue-700 font-semibold">当前渠道</p>
-            <p className="text-xs text-blue-600 font-mono">{getChannelId()}</p>
+      <div className="w-80 bg-white/80 backdrop-blur-sm border-r border-white/20 flex flex-col shadow-xl">
+        <div className="p-6 border-b border-gray-200/50 bg-gradient-to-r from-indigo-500 to-purple-600 text-white">
+          <div className="flex items-center space-x-3 mb-4">
+            <div className="w-10 h-10 bg-white/20 rounded-xl flex items-center justify-center">
+              <span className="text-xl">⚡</span>
+            </div>
+            <div>
+              <h1 className="text-xl font-bold">Nostr IM</h1>
+              <p className="text-indigo-100 text-sm">Decentralized Chat</p>
+            </div>
           </div>
-           <div className="flex items-center gap-2 mt-2">
-             <div className="w-2 h-2 bg-green-500 rounded-full"></div>
-             <span className="text-xs text-green-600">Connected to {wsConnections.length} relays</span>
-           </div>
+          
+          <div className="bg-white/10 rounded-xl p-4 backdrop-blur-sm">
+            <div className="flex items-center space-x-3 mb-3">
+              <div className="w-8 h-8 bg-white/20 rounded-full flex items-center justify-center">
+                <span className="text-sm">👤</span>
+              </div>
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-white truncate">{user?.name}</p>
+                <p className="text-indigo-200 text-xs truncate">
+                  {user?.pubkey?.substring(0, 16)}...
+                </p>
+              </div>
+            </div>
+            
+            <div className="space-y-2">
+              <div className="bg-white/10 rounded-lg p-2">
+                <p className="text-xs text-indigo-200 font-semibold mb-1">Current Channel</p>
+                <p className="text-xs text-white font-mono break-all">{getChannelId()}</p>
+              </div>
+              
+              <div className="flex items-center space-x-2">
+                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-xs text-indigo-200">
+                  Connected to {wsConnections.length} relays
+                </span>
+              </div>
+            </div>
+          </div>
         </div>
         
-        <div className="flex-1 p-4">
-          <div className="space-y-2">
-            <div className="p-3 bg-blue-50 rounded-lg">
-              <h3 className="font-semibold text-gray-900">Demo Chat</h3>
-              <p className="text-sm text-gray-600">Your conversation</p>
+        <div className="flex-1 p-6">
+          <div className="space-y-4">
+            <div className="p-4 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-2xl border border-blue-100">
+              <div className="flex items-center space-x-3 mb-2">
+                <div className="w-8 h-8 bg-blue-100 rounded-full flex items-center justify-center">
+                  <span className="text-blue-600 text-sm">💬</span>
+                </div>
+                <div>
+                  <h3 className="font-bold text-gray-900">Demo Chat</h3>
+                  <p className="text-sm text-gray-600">Your conversation</p>
+                </div>
+              </div>
             </div>
-            <div className="p-3 bg-gray-50 rounded-lg">
-              <h4 className="font-semibold text-gray-900 text-sm">Nostr Info</h4>
-              <p className="text-xs text-gray-600">Messages are sent via Nostr protocol</p>
-              <p className="text-xs text-gray-500 mt-1">
-                {messages.length} message{messages.length !== 1 ? 's' : ''} sent
-              </p>
+            
+            <div className="p-4 bg-gradient-to-r from-gray-50 to-slate-50 rounded-2xl border border-gray-100">
+              <div className="flex items-center space-x-3 mb-3">
+                <div className="w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center">
+                  <span className="text-gray-600 text-sm">⚡</span>
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-900 text-sm">Nostr Protocol</h4>
+                  <p className="text-xs text-gray-600">Decentralized messaging</p>
+                </div>
+              </div>
+              
+              <div className="space-y-2">
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500">Messages</span>
+                  <span className="text-xs font-semibold text-gray-700">
+                    {messages.length}
+                  </span>
+                </div>
+                <div className="flex justify-between items-center">
+                  <span className="text-xs text-gray-500">Status</span>
+                  <span className="text-xs font-semibold text-green-600 flex items-center">
+                    <div className="w-2 h-2 bg-green-400 rounded-full mr-1"></div>
+                    Online
+                  </span>
+                </div>
+              </div>
+            </div>
+            
+            <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-2xl border border-purple-100">
+              <div className="flex items-center space-x-3">
+                <div className="w-8 h-8 bg-purple-100 rounded-full flex items-center justify-center">
+                  <span className="text-purple-600 text-sm">🔒</span>
+                </div>
+                <div>
+                  <h4 className="font-bold text-gray-900 text-sm">Privacy</h4>
+                  <p className="text-xs text-gray-600">End-to-end encrypted</p>
+                </div>
+              </div>
             </div>
           </div>
         </div>
@@ -810,21 +933,35 @@ function App() {
       {/* Chat Area */}
       <div className="flex-1 flex flex-col">
         {/* Chat Header */}
-        <div className="bg-white border-b border-gray-200 p-4">
-          <h2 className="text-lg font-semibold text-gray-900">渠道聊天</h2>
-          <p className="text-sm text-gray-600">与同网站用户聊天</p>
+        <div className="bg-white/80 backdrop-blur-sm border-b border-white/20 p-6 shadow-sm">
+          <div className="flex items-center space-x-4">
+            <div className="w-12 h-12 bg-gradient-to-r from-indigo-500 to-purple-500 rounded-2xl flex items-center justify-center shadow-lg">
+              <span className="text-white text-xl">💬</span>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-gray-900">Channel Chat</h2>
+              <p className="text-sm text-gray-600">Connect with users on the same website</p>
+            </div>
+          </div>
         </div>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto p-4 space-y-4">
+        <div className="flex-1 overflow-y-auto p-6 space-y-6 bg-gradient-to-b from-transparent to-gray-50/30">
           {messages.length === 0 ? (
-            <div className="flex items-center justify-center h-full text-gray-500">
-              <div className="text-center">
-                <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-2xl">💬</span>
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center max-w-md">
+                <div className="w-24 h-24 bg-gradient-to-r from-indigo-100 to-purple-100 rounded-3xl flex items-center justify-center mx-auto mb-6 shadow-lg">
+                  <span className="text-4xl">💬</span>
                 </div>
-                <h3 className="text-lg font-semibold mb-2">No messages yet</h3>
-                <p>Start the conversation by sending your first message</p>
+                <h3 className="text-2xl font-bold text-gray-800 mb-3">Welcome to Nostr IM</h3>
+                <p className="text-gray-600 mb-6">Start the conversation by sending your first message</p>
+                <div className="flex items-center justify-center space-x-2 text-sm text-gray-500">
+                  <span>🔒</span>
+                  <span>End-to-end encrypted</span>
+                  <span>•</span>
+                  <span>⚡</span>
+                  <span>Decentralized</span>
+                </div>
               </div>
             </div>
           ) : (
@@ -835,32 +972,39 @@ function App() {
                const shortPubkey = msg.sender.substring(0, 8) + '...';
                
                return (
-                 <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-                   <div className={`px-4 py-2 rounded-2xl max-w-xs ${
+                 <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'} group`}>
+                   <div className={`max-w-md px-5 py-3 rounded-3xl shadow-lg transition-all duration-200 hover:shadow-xl ${
                      isOwnMessage 
-                       ? 'bg-blue-500 text-white' 
-                       : 'bg-gray-200 text-gray-900'
+                       ? 'bg-gradient-to-r from-indigo-500 to-purple-500 text-white rounded-br-lg' 
+                       : 'bg-white text-gray-900 border border-gray-100 rounded-bl-lg'
                    }`}>
                      {!isOwnMessage && (
-                       <div className="mb-1">
-                         <p className="text-xs font-semibold opacity-75">
-                           {senderName}
-                         </p>
-                         <p className="text-xs opacity-60 font-mono">
-                           {shortPubkey}
-                         </p>
+                       <div className="mb-2 flex items-center space-x-2">
+                         <div className="w-6 h-6 bg-gradient-to-r from-gray-400 to-gray-500 rounded-full flex items-center justify-center">
+                           <span className="text-white text-xs font-bold">
+                             {senderName.charAt(0).toUpperCase()}
+                           </span>
+                         </div>
+                         <div>
+                           <p className="text-xs font-semibold text-gray-700">
+                             {senderName}
+                           </p>
+                           <p className="text-xs text-gray-500 font-mono">
+                             {shortPubkey}
+                           </p>
+                         </div>
                        </div>
                      )}
-                     <p className="text-sm">{msg.text}</p>
-                     <div className="flex items-center justify-between mt-1">
+                     <p className="text-sm leading-relaxed">{msg.text}</p>
+                     <div className="flex items-center justify-between mt-2">
                        <p className={`text-xs ${
-                         isOwnMessage ? 'text-blue-100' : 'text-gray-500'
+                         isOwnMessage ? 'text-indigo-100' : 'text-gray-500'
                        }`}>
                          {new Date(msg.time).toLocaleTimeString()}
                        </p>
                        <div className="flex items-center gap-1">
-                         <span className="text-xs">✓</span>
-                         <span className="text-xs">Nostr</span>
+                         <span className={`text-xs ${isOwnMessage ? 'text-indigo-200' : 'text-gray-400'}`}>✓</span>
+                         <span className={`text-xs ${isOwnMessage ? 'text-indigo-200' : 'text-gray-400'}`}>Nostr</span>
                        </div>
                      </div>
                    </div>
@@ -872,22 +1016,28 @@ function App() {
          </div>
 
         {/* Message Input */}
-        <div className="bg-white border-t border-gray-200 p-4">
-          <div className="flex gap-3">
-            <input
-              type="text"
-              value={newMessage}
-              onChange={(e) => setNewMessage(e.target.value)}
-              onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
-              placeholder="Type a message..."
-              className="flex-1 px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-            />
+        <div className="bg-white/80 backdrop-blur-sm border-t border-white/20 p-6 shadow-lg">
+          <div className="flex gap-4">
+            <div className="flex-1 relative">
+              <input
+                type="text"
+                value={newMessage}
+                onChange={(e) => setNewMessage(e.target.value)}
+                onKeyPress={(e) => e.key === 'Enter' && handleSendMessage()}
+                placeholder="Type a message..."
+                className="w-full px-6 py-4 border-2 border-gray-200 rounded-2xl focus:ring-4 focus:ring-indigo-100 focus:border-indigo-400 transition-all duration-300 bg-gray-50 focus:bg-white text-gray-900 placeholder-gray-500"
+              />
+              <div className="absolute inset-y-0 right-0 pr-4 flex items-center">
+                <span className="text-gray-400">💬</span>
+              </div>
+            </div>
             <button
               onClick={handleSendMessage}
               disabled={!newMessage.trim()}
-              className="bg-blue-500 text-white px-6 py-3 rounded-xl font-semibold hover:bg-blue-600 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              className="bg-gradient-to-r from-indigo-500 to-purple-500 text-white px-8 py-4 rounded-2xl font-bold shadow-lg hover:shadow-xl transform hover:scale-105 transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none disabled:shadow-none flex items-center space-x-2"
             >
-              Send
+              <span>🚀</span>
+              <span>Send</span>
             </button>
           </div>
         </div>
