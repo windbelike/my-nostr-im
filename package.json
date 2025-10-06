@@ -2,6 +2,17 @@
   "name": "nostr-im",
   "version": "1.0.0",
   "description": "A decentralized instant messaging app built on the Nostr protocol",
+  "license": "AGPL-3.0",
+  "author": "Nostr IM Team",
+  "keywords": ["nostr", "messaging", "decentralized", "chat", "im", "react", "typescript"],
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/windbelike/my-nostr-im.git"
+  },
+  "bugs": {
+    "url": "https://github.com/windbelike/my-nostr-im/issues"
+  },
+  "homepage": "https://github.com/windbelike/my-nostr-im#readme",
   "type": "module",
   "scripts": {
     "dev": "vite",
