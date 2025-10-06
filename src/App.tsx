@@ -1,5 +1,5 @@
-import { useState, useEffect } from 'react';
-import { getPublicKey, finalizeEvent } from 'nostr-tools';
+import { useState, useEffect, useRef } from 'react';
+import { getPublicKey, finalizeEvent, generateSecretKey } from 'nostr-tools';
 
 function App() {
   const [step, setStep] = useState<'login' | 'chat'>('login');
@@ -8,7 +8,17 @@ function App() {
   const [newMessage, setNewMessage] = useState('');
   const [relays] = useState(['wss://relay.damus.io', 'wss://relay.snort.social']);
   const [wsConnections, setWsConnections] = useState<WebSocket[]>([]);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   
+  // 滚动到底部的函数
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  };
+  
+  // 当消息更新时自动滚动到底部
+  useEffect(() => {
+    scrollToBottom();
+  }, [messages]);
   
   // 获取当前网站渠道ID
   const getChannelId = () => {
@@ -93,13 +103,26 @@ function App() {
     }
   };
 
-  const handleLogin = (name: string) => {
-    // 从环境变量读取私钥
-    const privateKey = process.env.VITE_NOSTR_PRIVATE_KEY;
+  const handleLogin = (name: string, privateKeyInput: string) => {
+    let privateKey = privateKeyInput.trim();
     
+    // 如果用户没有输入私钥，自动生成一个
     if (!privateKey) {
-      alert('请在 .env 文件中配置 VITE_NOSTR_PRIVATE_KEY');
-      return;
+      const generatedKey = generateSecretKey();
+      privateKey = Array.from(generatedKey).map(b => b.toString(16).padStart(2, '0')).join('');
+      
+      // 弹窗提示用户保存私钥
+      const saveKey = confirm(
+        `🔑 已为您生成新的私钥！\n\n` +
+        `私钥: ${privateKey}\n\n` +
+        `⚠️ 请务必保存好您的私钥！\n` +
+        `私钥是您身份的唯一凭证，丢失后将无法恢复。\n\n` +
+        `点击"确定"继续，点击"取消"重新输入私钥。`
+      );
+      
+      if (!saveKey) {
+        return; // 用户取消，重新输入
+      }
     }
     
     // 从私钥推导公钥
@@ -108,7 +131,7 @@ function App() {
     console.log('Using keys:', { 
       privateKey: privateKey.substring(0, 8) + '...', 
       pubkey: pubkey.substring(0, 8) + '...',
-      source: 'env'
+      source: privateKeyInput.trim() ? 'user_input' : 'generated'
     });
     
     setUser({ name, pubkey, privateKey });
@@ -279,6 +302,9 @@ function App() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Nostr IM</h1>
             <p className="text-gray-600">Decentralized messaging</p>
+            <p className="text-xs text-gray-500 mt-2">
+              私钥可选：留空将自动生成，输入则使用您的私钥
+            </p>
           </div>
 
           <div className="space-y-4">
@@ -287,15 +313,36 @@ function App() {
               placeholder="Enter your name"
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               onKeyPress={(e) => {
-                if (e.key === 'Enter' && e.currentTarget.value.trim()) {
-                  handleLogin(e.currentTarget.value.trim());
+                if (e.key === 'Enter') {
+                  const name = (document.querySelector('input[placeholder="Enter your name"]') as HTMLInputElement)?.value;
+                  const privateKey = (document.querySelector('input[placeholder="Enter your private key"]') as HTMLInputElement)?.value;
+                  if (name?.trim() && privateKey?.trim()) {
+                    handleLogin(name.trim(), privateKey.trim());
+                  }
+                }
+              }}
+            />
+            <input
+              type="password"
+              placeholder="Enter your private key (optional - will generate if empty)"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              onKeyPress={(e) => {
+                if (e.key === 'Enter') {
+                  const name = (document.querySelector('input[placeholder="Enter your name"]') as HTMLInputElement)?.value;
+                  const privateKey = (document.querySelector('input[placeholder="Enter your private key (optional - will generate if empty)"]') as HTMLInputElement)?.value;
+                  if (name?.trim()) {
+                    handleLogin(name.trim(), privateKey || '');
+                  }
                 }
               }}
             />
             <button
               onClick={() => {
-                const name = (document.querySelector('input') as HTMLInputElement)?.value;
-                if (name?.trim()) handleLogin(name.trim());
+                const name = (document.querySelector('input[placeholder="Enter your name"]') as HTMLInputElement)?.value;
+                const privateKey = (document.querySelector('input[placeholder="Enter your private key (optional - will generate if empty)"]') as HTMLInputElement)?.value;
+                if (name?.trim()) {
+                  handleLogin(name.trim(), privateKey || '');
+                }
               }}
               className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-600 transition-all duration-200"
             >
@@ -365,24 +412,41 @@ function App() {
               </div>
             </div>
           ) : (
-            messages.map((msg) => (
-              <div key={msg.id} className="flex justify-end">
-                <div className="bg-blue-500 text-white px-4 py-2 rounded-2xl max-w-xs">
-                  <p className="text-sm">{msg.text}</p>
-                  <div className="flex items-center justify-between mt-1">
-                    <p className="text-xs text-blue-100">
-                      {new Date(msg.time).toLocaleTimeString()}
-                    </p>
-                    <div className="flex items-center gap-1">
-                      <span className="text-xs">✓</span>
-                      <span className="text-xs">Nostr</span>
+            messages.map((msg) => {
+              const isOwnMessage = msg.sender === user?.pubkey;
+              const senderName = isOwnMessage ? user?.name : `User_${msg.sender.substring(0, 8)}`;
+              
+              return (
+                <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                  <div className={`px-4 py-2 rounded-2xl max-w-xs ${
+                    isOwnMessage 
+                      ? 'bg-blue-500 text-white' 
+                      : 'bg-gray-200 text-gray-900'
+                  }`}>
+                    {!isOwnMessage && (
+                      <p className="text-xs font-semibold mb-1 opacity-75">
+                        {senderName}
+                      </p>
+                    )}
+                    <p className="text-sm">{msg.text}</p>
+                    <div className="flex items-center justify-between mt-1">
+                      <p className={`text-xs ${
+                        isOwnMessage ? 'text-blue-100' : 'text-gray-500'
+                      }`}>
+                        {new Date(msg.time).toLocaleTimeString()}
+                      </p>
+                      <div className="flex items-center gap-1">
+                        <span className="text-xs">✓</span>
+                        <span className="text-xs">Nostr</span>
+                      </div>
                     </div>
                   </div>
                 </div>
-              </div>
-            ))
-          )}
-        </div>
+              );
+             })
+           )}
+           <div ref={messagesEndRef} />
+         </div>
 
         {/* Message Input */}
         <div className="bg-white border-t border-gray-200 p-4">
