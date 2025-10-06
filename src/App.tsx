@@ -11,11 +11,15 @@ const wsConnectionsAtom = atom<WebSocket[]>([]);
 const userProfilesAtom = atom<Record<string, {name: string, about?: string, picture?: string}>>({});
 const subscribedUsersAtom = atom<Set<string>>(new Set<string>());
 
-// 全局连接存储，避免状态更新时机问题
-let globalConnections: WebSocket[] = [];
+  // 全局连接存储，避免状态更新时机问题
+  let globalConnections: WebSocket[] = [];
+  
+  // 全局用户信息存储，避免状态更新时机问题
+  let globalUser: {name: string, pubkey: string, privateKey: string} | null = null;
 
 function App() {
   const [step, setStep] = useState<'login' | 'chat'>('login');
+  const [loginMode, setLoginMode] = useState<'signin' | 'signup'>('signin');
   const [user, setUser] = useAtom(userAtom);
   const [messages, setMessages] = useAtom(messagesAtom);
   const [newMessage, setNewMessage] = useState('');
@@ -27,7 +31,9 @@ function App() {
   
   // 调试日志：跟踪subscribedUsers变化
   useEffect(() => {
-    console.log("📊 subscribedUsers updated:", Array.from(subscribedUsers).map(pk => pk.substring(0, 8) + "..."));
+    if (subscribedUsers.size > 0) {
+      console.log("📊 subscribedUsers updated:", subscribedUsers.size, "users");
+    }
   }, [subscribedUsers]);
   
   // 滚动到底部的函数
@@ -47,9 +53,6 @@ function App() {
     const currentSubscribedUsers = usersToSubscribe || subscribedUsers;
     const currentConnections = globalConnections.length > 0 ? globalConnections : wsConnections;
     
-    console.log("📊 subscribeAllProfiles called with users:", currentSubscribedUsers.size);
-    console.log("📊 Current subscribedUsers state:", subscribedUsers.size);
-    
     if (currentSubscribedUsers.size === 0) {
       console.log("📊 No users to subscribe to");
       return;
@@ -64,15 +67,39 @@ function App() {
       }]
     };
 
-    console.log("📡 Subscribing to profiles for users:", allUsers.map(pk => pk.substring(0, 8) + "..."));
-    console.log("📡 Using connections:", currentConnections.length);
+    console.log("📡 Subscribing to profiles for", allUsers.length, "users");
 
     currentConnections.forEach((ws, index) => {
       if (ws.readyState === WebSocket.OPEN) {
         ws.send(JSON.stringify(['REQ', sub.id, ...sub.filters]));
         console.log(`📡 Sent profile subscription to relay ${index}`);
-      } else {
-        console.log(`⚠️ Relay ${index} not ready, state: ${ws.readyState}`);
+      }
+    });
+  };
+
+  // 订阅特定用户的 profile 事件
+  const subscribeToUserProfile = (pubkey: string) => {
+    const currentConnections = globalConnections.length > 0 ? globalConnections : wsConnections;
+    
+    if (currentConnections.length === 0) {
+      console.log('⚠️ No connections available for profile subscription');
+      return;
+    }
+
+    const sub = {
+      id: `profile_${pubkey}`,
+      filters: [{
+        kinds: [0], // Profile metadata
+        authors: [pubkey]
+      }]
+    };
+
+    console.log(`📡 Subscribing to profile for user: ${pubkey.substring(0, 8)}...`);
+
+    currentConnections.forEach((ws, index) => {
+      if (ws.readyState === WebSocket.OPEN) {
+        ws.send(JSON.stringify(['REQ', sub.id, ...sub.filters]));
+        console.log(`📡 Sent profile subscription to relay ${index}`);
       }
     });
   };
@@ -80,7 +107,6 @@ function App() {
   // 添加用户到订阅列表并立即订阅
   const addUserToSubscription = (pubkey: string) => {
     if (subscribedUsers.has(pubkey)) {
-      console.log(`👤 User already subscribed: ${pubkey.substring(0, 8)}...`);
       return;
     }
 
@@ -88,7 +114,6 @@ function App() {
     
     // 创建新的用户集合
     const newSet = new Set([...subscribedUsers, pubkey]);
-    console.log(`👤 New user set size: ${newSet.size}`);
     
     // 立即订阅所有用户（包括新用户），传递新的用户集合
     subscribeAllProfiles(newSet);
@@ -97,13 +122,6 @@ function App() {
     setSubscribedUsers(newSet);
   };
 
-  // 强制订阅所有用户（调试用）
-  const forceSubscribeAll = () => {
-    console.log("🚀 Force subscribing to all users...");
-    console.log("Current subscribedUsers:", Array.from(subscribedUsers));
-    console.log("Current wsConnections:", wsConnections.length);
-    subscribeAllProfiles();
-  };
   
   // 获取当前网站渠道ID
   const getChannelId = () => {
@@ -192,27 +210,24 @@ function App() {
     }
   };
 
-  const handleLogin = (name: string, privateKeyInput: string) => {
-    let privateKey = privateKeyInput.trim();
-    
-    // 如果用户没有输入私钥，自动生成一个
-    if (!privateKey) {
-      const generatedKey = generateSecretKey();
-      privateKey = Array.from(generatedKey).map(b => b.toString(16).padStart(2, '0')).join('');
-      
-      // 弹窗提示用户保存私钥
-      const saveKey = confirm(
-        `🔑 已为您生成新的私钥！\n\n` +
-        `私钥: ${privateKey}\n\n` +
-        `⚠️ 请务必保存好您的私钥！\n` +
-        `私钥是您身份的唯一凭证，丢失后将无法恢复。\n\n` +
-        `点击"确定"继续，点击"取消"重新输入私钥。`
-      );
-      
-      if (!saveKey) {
-        return; // 用户取消，重新输入
+  const handleSignIn = (privateKeyInput: string) => {
+    if (!privateKeyInput?.trim()) {
+      // 使用更友好的提示方式
+      const privateKeyInput = document.querySelector('input[placeholder="Enter your private key"]') as HTMLInputElement;
+      if (privateKeyInput) {
+        privateKeyInput.focus();
+        privateKeyInput.style.borderColor = '#ef4444';
+        privateKeyInput.placeholder = '请输入您的私钥';
+        setTimeout(() => {
+          privateKeyInput.style.borderColor = '';
+          privateKeyInput.placeholder = 'Enter your private key';
+        }, 3000);
       }
+      return;
     }
+    
+    const privateKey = privateKeyInput.trim();
+    console.log('🔐 Sign In with private key:', privateKey.substring(0, 8) + '...');
     
     // 从私钥推导公钥
     const pubkey = derivePublicKey(privateKey);
@@ -220,22 +235,137 @@ function App() {
     console.log('Using keys:', { 
       privateKey: privateKey.substring(0, 8) + '...', 
       pubkey: pubkey.substring(0, 8) + '...',
-      source: privateKeyInput.trim() ? 'user_input' : 'generated'
+      source: 'user_input'
     });
     
-     setUser({ name, pubkey, privateKey });
-     setStep('chat');
-     
-     // 添加自己到订阅列表
-     addUserToSubscription(pubkey);
-     
-     // Connect to relays
-     connectToRelays();
-     
-     // Send profile event (kind:0) when user comes online (延迟发送，等待连接建立)
-     setTimeout(() => {
-       sendProfileEvent(name, pubkey, privateKey);
-     }, 2000);
+    // 先设置用户信息，用户名暂时使用公钥前缀
+    const userInfo = { name: `User_${pubkey.substring(0, 8)}`, pubkey, privateKey };
+    setUser(userInfo);
+    globalUser = userInfo; // 同时更新全局用户信息
+    setStep('chat');
+    
+    // 添加自己到订阅列表
+    addUserToSubscription(pubkey);
+    
+    // Connect to relays
+    connectToRelays();
+    
+    // 订阅自己的 profile 事件来获取真实用户名
+    setTimeout(() => {
+      subscribeToUserProfile(pubkey);
+    }, 1000);
+  };
+
+  const handleSignUp = (name: string) => {
+    console.log('🔐 Sign Up - generating new key for:', name);
+    
+    // 生成新私钥
+    const generatedKey = generateSecretKey();
+    const privateKey = Array.from(generatedKey).map(b => b.toString(16).padStart(2, '0')).join('');
+    
+    // 显示私钥保存提示
+    const showPrivateKeyModal = () => {
+      const modal = document.createElement('div');
+      modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+      modal.innerHTML = `
+        <div class="bg-white rounded-2xl p-6 max-w-md mx-4 shadow-2xl">
+          <div class="text-center mb-4">
+            <div class="w-12 h-12 bg-yellow-100 rounded-full flex items-center justify-center mx-auto mb-3">
+              <span class="text-2xl">🔑</span>
+            </div>
+            <h3 class="text-lg font-bold text-gray-900 mb-2">新私钥已生成</h3>
+            <p class="text-sm text-gray-600">请务必保存好您的私钥！</p>
+          </div>
+          
+          <div class="bg-gray-50 rounded-lg p-3 mb-4">
+            <p class="text-xs text-gray-500 mb-1">您的私钥：</p>
+            <p class="text-sm font-mono break-all text-gray-800">${privateKey}</p>
+          </div>
+          
+          <div class="bg-yellow-50 border border-yellow-200 rounded-lg p-3 mb-4">
+            <p class="text-xs text-yellow-800">
+              ⚠️ 私钥是您身份的唯一凭证，丢失后将无法恢复！
+            </p>
+          </div>
+          
+          <div class="flex gap-3">
+            <button id="copyKey" class="flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-600 transition-colors">
+              复制私钥
+            </button>
+            <button id="continueBtn" class="flex-1 bg-green-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-green-600 transition-colors">
+              继续
+            </button>
+          </div>
+          
+          <button id="cancelBtn" class="w-full mt-2 text-gray-500 hover:text-gray-700 text-sm">
+            取消注册
+          </button>
+        </div>
+      `;
+      
+      document.body.appendChild(modal);
+      
+      // 复制私钥功能
+      modal.querySelector('#copyKey')?.addEventListener('click', () => {
+        navigator.clipboard.writeText(privateKey).then(() => {
+          const btn = modal.querySelector('#copyKey') as HTMLButtonElement;
+          btn.textContent = '已复制！';
+          btn.className = 'flex-1 bg-green-500 text-white py-2 px-4 rounded-lg font-semibold transition-colors';
+          setTimeout(() => {
+            btn.textContent = '复制私钥';
+            btn.className = 'flex-1 bg-blue-500 text-white py-2 px-4 rounded-lg font-semibold hover:bg-blue-600 transition-colors';
+          }, 2000);
+        });
+      });
+      
+      // 继续按钮
+      modal.querySelector('#continueBtn')?.addEventListener('click', () => {
+        document.body.removeChild(modal);
+        proceedWithSignUp();
+      });
+      
+      // 取消按钮
+      modal.querySelector('#cancelBtn')?.addEventListener('click', () => {
+        document.body.removeChild(modal);
+      });
+      
+      // 点击背景关闭
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) {
+          document.body.removeChild(modal);
+        }
+      });
+    };
+    
+    const proceedWithSignUp = () => {
+      // 从私钥推导公钥
+      const pubkey = derivePublicKey(privateKey);
+      
+      console.log('Using keys:', { 
+        privateKey: privateKey.substring(0, 8) + '...', 
+        pubkey: pubkey.substring(0, 8) + '...',
+        source: 'generated'
+      });
+      
+      const userInfo = { name, pubkey, privateKey };
+      setUser(userInfo);
+      globalUser = userInfo; // 同时更新全局用户信息
+      setStep('chat');
+      
+      // 添加自己到订阅列表
+      addUserToSubscription(pubkey);
+      
+      // Connect to relays
+      connectToRelays();
+      
+      // Send profile event (kind:0) when user comes online (延迟发送，等待连接建立)
+      setTimeout(() => {
+        sendProfileEvent(name, pubkey, privateKey);
+      }, 2000);
+    };
+    
+    // 显示私钥保存模态框
+    showPrivateKeyModal();
   };
 
   // 发送个人资料事件 (kind:0)
@@ -286,7 +416,6 @@ function App() {
       };
       
       // Send to all connected relays
-      console.log(`📤 Attempting to send profile event, connections:`, currentConnections.length);
       if (currentConnections.length === 0) {
         console.log(`⚠️ No WebSocket connections available, retrying in 1 second...`);
         setTimeout(() => {
@@ -295,13 +424,10 @@ function App() {
         return;
       }
       
-      console.log("currentConnections on sendProfileEvent: ", currentConnections);
       currentConnections.forEach((ws, index) => {
         if (ws.readyState === WebSocket.OPEN) {
-          console.log(`📤 Profile event sent to relay ${index}:`, event);
           ws.send(JSON.stringify(['EVENT', event]));
-        } else {
-          console.log(`⚠️ Relay ${index} not ready, state: ${ws.readyState}`);
+          console.log(`📤 Profile event sent to relay ${index}`);
         }
       });
       
@@ -331,23 +457,17 @@ function App() {
            };
           ws.send(JSON.stringify(['REQ', sub.id, ...sub.filters]));
           console.log(`📡 Subscribed to channel: ${channelId}`);
-          console.log(`📋 Subscription filters:`, sub.filters);
           
           // 连接建立后，订阅所有已订阅用户的个人资料
           setTimeout(() => {
-            console.log("🔌 Connection established, checking for users to subscribe...");
             if (subscribedUsers.size > 0) {
-              console.log(`📡 Found ${subscribedUsers.size} users to subscribe`);
               subscribeAllProfiles();
-            } else {
-              console.log("📊 No users to subscribe yet");
             }
           }, 500);
           
           // 如果当前用户已登录，发送个人资料事件
           if (user?.name && user?.pubkey && user?.privateKey) {
             setTimeout(() => {
-              console.log(`📤 Sending profile event for current user: ${user.pubkey.substring(0, 8)}...`);
               sendProfileEvent(user.name, user.pubkey, user.privateKey, [ws]);
             }, 1000);
           }
@@ -358,28 +478,35 @@ function App() {
              const data = JSON.parse(event.data);
              if (data[0] === 'EVENT') {
                const event = data[2];
-               
-               if (event.kind === 0) {
-                 // Profile metadata received
-                 console.log("kind:0 profile event received, event:" + JSON.stringify(event));
-                 try {
-                   const profile = JSON.parse(event.content);
-                   setUserProfiles(prev => ({
-                     ...prev,
-                     [event.pubkey]: {
-                       name: profile.name || `User_${event.pubkey.substring(0, 8)}`,
-                       about: profile.about,
-                       picture: profile.picture
-                     }
-                   }));
-                   console.log(`👤 Profile updated for ${event.pubkey}:`, profile.name);
-                 } catch (e) {
-                   console.log('Failed to parse profile:', e);
-                 }
-               } else if (event.kind === 1) {
+                  if (event.kind === 0) {
+                    // console.log('Profile metadata received, event:', event);
+                    // Profile metadata received
+                    try {
+                      const profile = JSON.parse(event.content);
+                      const profileName = profile.name || `User_${event.pubkey.substring(0, 8)}`;
+                      
+                      setUserProfiles(prev => ({
+                        ...prev,
+                        [event.pubkey]: {
+                          name: profileName,
+                          about: profile.about,
+                          picture: profile.picture
+                        }
+                      }));
+                      
+                      
+                      if (globalUser && event.pubkey === globalUser.pubkey) {
+                        const updatedUser = { ...globalUser, name: profileName };
+                        setUser(updatedUser);
+                        globalUser = updatedUser; // 同时更新全局用户信息
+                      }                      
+                      console.log(`👤 Profile updated: ${profileName}`);
+                    } catch (e) {
+                      console.log('Failed to parse profile:', e);
+                    }
+                  } else if (event.kind === 1) {
                  // Text note received
                  const channelId = getChannelId();
-                 console.log("kind:1 text note received, event:" + JSON.stringify(event));
                  
                  // 检查消息是否属于当前渠道
                  const hasChannelTag = event.tags && event.tags.some((tag: any) => 
@@ -402,11 +529,15 @@ function App() {
                      // 检查是否已存在相同ID的消息，避免重复
                      const exists = prev.some(msg => msg.id === message.id);
                      if (!exists) {
-                       return [...prev, message];
+                       const newMessages = [...prev, message];
+                       // 按时间排序（旧到新）
+                       return newMessages.sort((a, b) => a.time - b.time);
+                     } else {
+                       console.log('⚠️ Duplicate message detected, skipping:', message.id);
                      }
                      return prev;
                    });
-                   console.log(`📨 Received message for channel ${channelId}:`, event.content);
+                   console.log(`📨 Message: ${event.content.substring(0, 50)}...`);
                  }
                }
              }
@@ -496,13 +627,24 @@ function App() {
         event: event
       };
       
-       setMessages(prev => [...prev, message]);
+       setMessages(prev => {
+         // 检查是否已存在相同ID的消息，避免重复
+         const exists = prev.some(msg => msg.id === message.id);
+         if (!exists) {
+           const newMessages = [...prev, message];
+           // 按时间排序（旧到新）
+           return newMessages.sort((a, b) => a.time - b.time);
+         } else {
+           console.log('⚠️ Duplicate sent message detected, skipping:', message.id);
+         }
+         return prev;
+       });
        setNewMessage('');
        
        // 确保发送者也被订阅个人资料
        addUserToSubscription(user.pubkey);
        
-       console.log(`📤 Message sent to channel ${channelId}:`, event);
+       console.log(`📤 Message sent: ${newMessage.substring(0, 30)}...`);
     } catch (error) {
       console.error('Failed to send message:', error);
     }
@@ -518,53 +660,111 @@ function App() {
             </div>
             <h1 className="text-2xl font-bold text-gray-900 mb-2">Nostr IM</h1>
             <p className="text-gray-600">Decentralized messaging</p>
-            <p className="text-xs text-gray-500 mt-2">
-              私钥可选：留空将自动生成，输入则使用您的私钥
-            </p>
           </div>
 
-          <div className="space-y-4">
-            <input
-              type="text"
-              placeholder="Enter your name"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  const name = (document.querySelector('input[placeholder="Enter your name"]') as HTMLInputElement)?.value;
-                  const privateKey = (document.querySelector('input[placeholder="Enter your private key"]') as HTMLInputElement)?.value;
-                  if (name?.trim() && privateKey?.trim()) {
-                    handleLogin(name.trim(), privateKey.trim());
-                  }
-                }
-              }}
-            />
-            <input
-              type="password"
-              placeholder="Enter your private key (optional - will generate if empty)"
-              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
-              onKeyPress={(e) => {
-                if (e.key === 'Enter') {
-                  const name = (document.querySelector('input[placeholder="Enter your name"]') as HTMLInputElement)?.value;
-                  const privateKey = (document.querySelector('input[placeholder="Enter your private key (optional - will generate if empty)"]') as HTMLInputElement)?.value;
-                  if (name?.trim()) {
-                    handleLogin(name.trim(), privateKey || '');
-                  }
-                }
-              }}
-            />
+          {/* 模式选择 */}
+          <div className="flex mb-6 bg-gray-100 rounded-xl p-1">
             <button
-              onClick={() => {
-                const name = (document.querySelector('input[placeholder="Enter your name"]') as HTMLInputElement)?.value;
-                const privateKey = (document.querySelector('input[placeholder="Enter your private key (optional - will generate if empty)"]') as HTMLInputElement)?.value;
-                if (name?.trim()) {
-                  handleLogin(name.trim(), privateKey || '');
-                }
-              }}
-              className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-600 transition-all duration-200"
+              onClick={() => setLoginMode('signin')}
+              className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all ${
+                loginMode === 'signin'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
             >
-              Start Chatting
+              Sign In
+            </button>
+            <button
+              onClick={() => setLoginMode('signup')}
+              className={`flex-1 py-2 px-4 rounded-lg font-semibold transition-all ${
+                loginMode === 'signup'
+                  ? 'bg-white text-blue-600 shadow-sm'
+                  : 'text-gray-600 hover:text-gray-900'
+              }`}
+            >
+              Sign Up
             </button>
           </div>
+
+          {loginMode === 'signin' ? (
+            // Sign In 表单
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Private Key
+                </label>
+                <input
+                  type="password"
+                  placeholder="Enter your private key"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const privateKey = (document.querySelector('input[placeholder="Enter your private key"]') as HTMLInputElement)?.value;
+                      if (privateKey?.trim()) {
+                        handleSignIn(privateKey.trim());
+                      }
+                    }
+                  }}
+                />
+              </div>
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <span className="font-semibold">Sign In with Private Key</span><br />
+                  Your username will be loaded from your profile.
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const privateKey = (document.querySelector('input[placeholder="Enter your private key"]') as HTMLInputElement)?.value;
+                  if (privateKey?.trim()) {
+                    handleSignIn(privateKey.trim());
+                  }
+                }}
+                className="w-full bg-gradient-to-r from-blue-500 to-purple-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-blue-600 hover:to-purple-600 transition-all duration-200"
+              >
+                Sign In
+              </button>
+            </div>
+          ) : (
+            // Sign Up 表单
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Username
+                </label>
+                <input
+                  type="text"
+                  placeholder="Choose a username"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+                  onKeyPress={(e) => {
+                    if (e.key === 'Enter') {
+                      const name = (document.querySelector('input[placeholder="Choose a username"]') as HTMLInputElement)?.value;
+                      if (name?.trim()) {
+                        handleSignUp(name.trim());
+                      }
+                    }
+                  }}
+                />
+              </div>
+              <div className="p-3 bg-blue-50 rounded-lg">
+                <p className="text-sm text-blue-700">
+                  <span className="font-semibold">New to Nostr?</span><br />
+                  We'll generate a new private key for you. Make sure to save it!
+                </p>
+              </div>
+              <button
+                onClick={() => {
+                  const name = (document.querySelector('input[placeholder="Choose a username"]') as HTMLInputElement)?.value;
+                  if (name?.trim()) {
+                    handleSignUp(name.trim());
+                  }
+                }}
+                className="w-full bg-gradient-to-r from-green-500 to-blue-500 text-white py-3 px-6 rounded-xl font-semibold hover:from-green-600 hover:to-blue-600 transition-all duration-200"
+              >
+                Create Account
+              </button>
+            </div>
+          )}
         </div>
       </div>
     );
@@ -587,45 +787,6 @@ function App() {
            <div className="flex items-center gap-2 mt-2">
              <div className="w-2 h-2 bg-green-500 rounded-full"></div>
              <span className="text-xs text-green-600">Connected to {wsConnections.length} relays</span>
-           </div>
-           <div className="mt-2 space-y-1">
-             <button
-               onClick={() => subscribeAllProfiles()}
-               className="w-full px-3 py-1 bg-blue-500 text-white text-xs rounded hover:bg-blue-600"
-             >
-               Subscribe Profiles
-             </button>
-             <button
-               onClick={() => forceSubscribeAll()}
-               className="w-full px-3 py-1 bg-red-500 text-white text-xs rounded hover:bg-red-600"
-             >
-               Force Subscribe
-             </button>
-             <button
-               onClick={() => {
-                 if (user?.name && user?.pubkey && user?.privateKey) {
-                   console.log(`📤 Manually sending profile event...`);
-                   sendProfileEvent(user.name, user.pubkey, user.privateKey);
-                 }
-               }}
-               className="w-full px-3 py-1 bg-green-500 text-white text-xs rounded hover:bg-green-600"
-             >
-               Send Profile
-             </button>
-             <button
-               onClick={() => {
-                 if (user?.pubkey) {
-                   console.log(`👤 Manually adding current user to subscription...`);
-                   addUserToSubscription(user.pubkey);
-                 }
-               }}
-               className="w-full px-3 py-1 bg-purple-500 text-white text-xs rounded hover:bg-purple-600"
-             >
-               Add User
-             </button>
-             <div className="text-xs text-gray-500">
-               Users: {subscribedUsers.size}
-             </div>
            </div>
         </div>
         
@@ -671,35 +832,41 @@ function App() {
                const isOwnMessage = msg.sender === user?.pubkey;
                const senderProfile = userProfiles[msg.sender];
                const senderName = isOwnMessage ? user?.name : (senderProfile?.name || `User_${msg.sender.substring(0, 8)}`);
+               const shortPubkey = msg.sender.substring(0, 8) + '...';
                
                return (
-                <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
-                  <div className={`px-4 py-2 rounded-2xl max-w-xs ${
-                    isOwnMessage 
-                      ? 'bg-blue-500 text-white' 
-                      : 'bg-gray-200 text-gray-900'
-                  }`}>
-                    {!isOwnMessage && (
-                      <p className="text-xs font-semibold mb-1 opacity-75">
-                        {senderName}
-                      </p>
-                    )}
-                    <p className="text-sm">{msg.text}</p>
-                    <div className="flex items-center justify-between mt-1">
-                      <p className={`text-xs ${
-                        isOwnMessage ? 'text-blue-100' : 'text-gray-500'
-                      }`}>
-                        {new Date(msg.time).toLocaleTimeString()}
-                      </p>
-                      <div className="flex items-center gap-1">
-                        <span className="text-xs">✓</span>
-                        <span className="text-xs">Nostr</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              );
-             })
+                 <div key={msg.id} className={`flex ${isOwnMessage ? 'justify-end' : 'justify-start'}`}>
+                   <div className={`px-4 py-2 rounded-2xl max-w-xs ${
+                     isOwnMessage 
+                       ? 'bg-blue-500 text-white' 
+                       : 'bg-gray-200 text-gray-900'
+                   }`}>
+                     {!isOwnMessage && (
+                       <div className="mb-1">
+                         <p className="text-xs font-semibold opacity-75">
+                           {senderName}
+                         </p>
+                         <p className="text-xs opacity-60 font-mono">
+                           {shortPubkey}
+                         </p>
+                       </div>
+                     )}
+                     <p className="text-sm">{msg.text}</p>
+                     <div className="flex items-center justify-between mt-1">
+                       <p className={`text-xs ${
+                         isOwnMessage ? 'text-blue-100' : 'text-gray-500'
+                       }`}>
+                         {new Date(msg.time).toLocaleTimeString()}
+                       </p>
+                       <div className="flex items-center gap-1">
+                         <span className="text-xs">✓</span>
+                         <span className="text-xs">Nostr</span>
+                       </div>
+                     </div>
+                   </div>
+                 </div>
+               );
+              })
            )}
            <div ref={messagesEndRef} />
          </div>
